@@ -445,7 +445,37 @@
   opacity: 0.6;
 }
 
-@media only screen and (max-width: 900px) {
+@media only screen and (max-width: 500px) {
+  .cookieConsent {
+    display: block;
+  }
+
+  .cookieConsent__Right {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .cookieConsent__Button {
+    margin: 0 5px 5px 0;
+    padding-top: 5px;
+    padding-right: 10px;
+    padding-bottom: 5px;
+    padding-left: 10px;
+  }
+
+  .cookieConsentOperations__List {
+    padding: 10px;
+  }
+
+  .cookieConsent__Button--Close {
+    margin: 40px 0 0;
+  }
+}
+
+@media only screen and (max-width: 1200px) and (min-width: 500px) {
   .cookieConsent {
     display: block;
   }
