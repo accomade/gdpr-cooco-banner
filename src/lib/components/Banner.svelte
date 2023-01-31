@@ -52,14 +52,22 @@
     }
 
     if(cookie) {
-      chosen = JSON.parse(cookie)
-      const valid = validate()
 
-      if (!valid) {
+      try {
+        chosen = JSON.parse(cookie)
+      }
+      catch(e) {
+        //JSON parse error ... some tinkering?
         removeCookie()
         showBanner()
       }
 
+      const valid = validate()
+      if (!valid) {
+        removeCookie()
+        showBanner()
+      }
+    
       execute()
     }
   })
