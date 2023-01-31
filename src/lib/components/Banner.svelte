@@ -51,20 +51,16 @@
       showBanner()
     }
 
-    try {
-      if(cookie) {
-        chosen = JSON.parse(cookie)
-        const valid = validate()
+    if(cookie) {
+      chosen = JSON.parse(cookie)
+      const valid = validate()
 
-        if (!valid) {
-          throw new Error('cookie consent has changed')
-        }
-
-        execute()
+      if (!valid) {
+        removeCookie()
+        showBanner()
       }
-    } catch (e) {
-      removeCookie()
-      showBanner()
+
+      execute()
     }
   })
 
@@ -73,12 +69,11 @@
     expires.setDate(expires.getDate() + 365)
     
     const cookieString = JSON.stringify(chosen);
-    console.log(cookieString)
-
     Cookies.set(cookieName, 
       cookieString, 
       { 
-        path: "/",
+        sameSite: 'strict',
+        path: '/',
         expires 
       })
   }
@@ -149,8 +144,9 @@
 
 
   const validate = ():boolean => {
-    const missing = choices.filter( (reqCookie) => chosen[reqCookie] );
-    return missing.length != choices.length;
+    
+    const missing = choices.filter( (reqCookie) => !!chosen[reqCookie] );
+    return missing.length == choices.length;
   }
   
   const value = (ct:CookieType):boolean => {

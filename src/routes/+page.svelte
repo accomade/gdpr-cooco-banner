@@ -19,7 +19,7 @@
     },
     cookieLabels: {
       necessary: 'Necessary cookies',
-      preferences: 'Tracking cookies',
+      preferences: 'Preference cookies',
       analytics: 'Analytics cookies',
       marketing: 'Marketing cookies'
     }
@@ -33,7 +33,7 @@
 
 <Banner 
     {translation} 
-    choices={["necessary", "analytics"]} 
+    choices={["necessary", "preferences"]} 
     on:analytics={ analytics }
   />
 
