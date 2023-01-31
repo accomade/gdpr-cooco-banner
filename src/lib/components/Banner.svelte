@@ -1,158 +1,177 @@
 <script lang="ts">
   import Cookies from 'js-cookie'
-  import { validate } from '../util'
   import { fade } from 'svelte/transition'
   import { onMount, createEventDispatcher } from 'svelte'
-
-  const dispatch = createEventDispatcher()
-
-  export let cookieName:string|undefined = undefined
+  import type { CookieType, CookieChoice, Translation } from '$lib/types/cookie';
+  
+  const dispatchAnalytics = createEventDispatcher<{analytics: { enabled: boolean}}>()
+  const dispatchMarketing = createEventDispatcher<{marketing: { enabled: boolean}}>()
+  const dispatchTracking = createEventDispatcher<{tracking: { enabled: boolean}}>()
+  
+  export let cookieName = "gdpr-cookie-consent"
   export let showEditIcon = true
+  export let translation:Translation
+  
+  /**Set by client, defines which cookie options will be displayed*/
+  export let choices:CookieType[]
+  /**The options the user has chosen, from the set of possible options*/
+  type Chosen = {[key in CookieType]?: CookieChoice};
+  let chosen:Chosen = {}
 
-  let shown = false
-  let settingsShown = false
+  // (re)init chosen based on choices
+  $: {
+    for(const ct of choices) {
+      let choice = chosen[ct]
+      
+      //necessary is alway true
+      if(ct == 'necessary') {
+        choice = { value: true }
+      }
 
-  export let heading = 'GDPR Notice'
-  export let description =
-    'We use cookies to offer a better browsing experience, analyze site traffic, personalize content, and serve targeted advertisements. Please review our privacy policy & cookies information page. By clicking accept, you consent to our privacy policy & use of cookies.'
+      if (!choice) {
+        choice = { value: false }
+      }
 
-  export let categories = {
-    analytics: function () {},
-    tracking: function () {},
-    marketing: function () {},
-    necessary: function () {}
-  }
-
-  export let cookieConfig = {}
-
-  const defaults = {
-    sameSite: 'strict'
-  }
-
-  export let choices = {}
-  const choicesDefaults = {
-    necessary: {
-      label: 'Necessary cookies',
-      description: "Used for cookie control. Can't be turned off.",
-      value: true
-    },
-    tracking: {
-      label: 'Tracking cookies',
-      description: 'Used for advertising purposes.',
-      value: true
-    },
-    analytics: {
-      label: 'Analytics cookies',
-      description:
-        'Used to control Google Analytics, a 3rd party tool offered by Google to track user behavior.',
-      value: true
-    },
-    marketing: {
-      label: 'Marketing cookies',
-      description: 'Used for marketing data.',
-      value: true
+      chosen[ct] = choice;
     }
   }
 
-  $: choicesMerged = Object.assign({}, choicesDefaults, choices)
-
-  $: choicesArr = Object.values(choicesMerged).map((item, index) => {
-    return Object.assign(
-      {},
-      item,
-      { id: Object.keys(choicesMerged)[index] }
-    )
-  })
-
-  $: cookieChoices = choicesArr.reduce((result, item) => {
-    result[item.id] = item.value ? item.value : false
-    return result
-  }, {})
-
-  $: necessaryCookieChoices = choicesArr.reduce((result, item) => {
-    result[item.id] = item.id === 'necessary'
-    return result
-  }, {})
-
-  export let acceptLabel = 'Accept cookies'
-  export let rejectLabel = 'Reject cookies'
-  export let settingsLabel = 'Cookie settings'
-  export let closeLabel = 'Close settings'
-  export let editLabel = 'Edit cookie settings'
+  let shown = false
+  let settingsShown = false
 
   export function show () {
     shown = true
   }
 
   onMount(() => {
-    if (!cookieName) {
-      throw new Error('You must set gdpr cookie name')
-    }
-
+    
+    /**Read cookie*/
     const cookie = Cookies.get(cookieName)
     if (!cookie) {
       show()
     }
 
     try {
-      const { choices } = JSON.parse(cookie)
-      const valid = validate(cookieChoices, choices)
+      if(cookie) {
+        chosen = JSON.parse(cookie)
+        const valid = validate()
 
-      if (!valid) {
-        throw new Error('cookie consent has changed')
+        if (!valid) {
+          throw new Error('cookie consent has changed')
+        }
+
+        execute()
       }
-
-      execute(choices)
     } catch (e) {
       removeCookie()
       show()
     }
   })
 
-  function setCookie (choices) {
+  const setCookie = () => {
     const expires = new Date()
     expires.setDate(expires.getDate() + 365)
+    
+    const cookieString = JSON.stringify(chosen);
+    console.log(cookieString)
 
-    const options = Object.assign({}, defaults, cookieConfig, { expires })
-    Cookies.set(cookieName, JSON.stringify({ choices }), options)
+    Cookies.set(cookieName, 
+      cookieString, 
+      { 
+        path: "/",
+        expires 
+      })
   }
 
   function removeCookie () {
-    const { path } = cookieConfig
-    Cookies.remove(cookieName, Object.assign({}, path ? { path } : {}))
+    Cookies.remove(cookieName, { path: "/" })
   }
 
-  function execute (chosen) {
-    const types = Object.keys(cookieChoices)
+  function execute () {
+    let t: keyof Chosen;
+    for( t in chosen) {
+      const choice = chosen[t]
 
-    types.forEach(t => {
-      const agreed = chosen[t]
-      if (choicesMerged[t]) {
-        choicesMerged[t].value = agreed
+      if(choice) {
+
+        switch(t) {
+          case 'analytics': 
+            dispatchAnalytics('analytics', { enabled: choice.value })
+            break;
+          case 'tracking':
+            dispatchTracking('tracking', { enabled: choice.value })
+            break;
+          case 'marketing':
+            dispatchMarketing('marketing', { enabled: choice.value })
+            break;
+        }
       }
-      if (agreed) {
-        categories[t] && categories[t]()
-        dispatch(`${t}`)
-      }
-    })
+    }
     shown = false
   }
 
-  function reject () {
-    setCookie(necessaryCookieChoices)
-    execute(necessaryCookieChoices)
+  const accept = () => {
+    for( const t of choices ) {
+      chosen[t] = {
+        value: true
+      }
+    }
+
+    setCookie()
+    execute()
   }
 
-  function choose () {
-    setCookie(cookieChoices)
-    execute(cookieChoices)
+  const reject = () => {
+    for( const t of choices ) {
+      if(t == 'necessary') {
+        chosen[t] = {
+          value: true
+        }
+      }
+      else {
+        chosen[t] = {
+          value: false
+        }
+      }
+    }
+ 
+    setCookie()
+    execute()
   }
+
+
+  const validate = ():boolean => {
+    const missing = choices.filter( (reqCookie) => chosen[reqCookie] );
+    return missing.length != choices.length;
+  }
+  
+  const value = (ct:CookieType):boolean => {
+    let choice = chosen[ct]
+    if( !choice ){
+      return false;
+    }
+
+    return choice.value
+  }
+
+  const toggled = (ct:CookieType) => {
+    let choice = chosen[ct]
+    if( !choice ){
+      choice = {value: true}
+    }
+    else {
+      choice.value = !choice.value
+    }
+
+    chosen[ct] = choice
+  }
+
 </script>
 
 {#if showEditIcon}
   <button
     class="cookieConsentToggle"
-    aria-label={editLabel}
+    aria-label={translation.editLabel}
     on:click={show}
     transition:fade>
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
@@ -177,9 +196,9 @@
   <div class="cookieConsent">
     <div class="cookieConsent__Left">
       <div class="cookieConsent__Content">
-        <p class="cookieConsent__Title">{heading}</p>
+        <p class="cookieConsent__Title">{translation.heading}</p>
         <p class="cookieConsent__Description">
-          {@html description}
+          {@html translation.description}
         </p>
       </div>
     </div>
@@ -187,15 +206,15 @@
       <button
         type="button"
         class="cookieConsent__Button"
-        aria-label={settingsLabel}
+        aria-label={translation.settingsLabel}
         on:click={() => { settingsShown = true } }>
-        {settingsLabel}
+        {translation.settingsLabel}
       </button>
-      <button type="submit" class="cookieConsent__Button" on:click={reject} aria-label={rejectLabel}>
-        {rejectLabel}
+      <button type="submit" class="cookieConsent__Button" on:click={reject} aria-label={translation.rejectLabel}>
+        {translation.rejectLabel}
       </button>
-      <button type="submit" class="cookieConsent__Button" on:click={choose} aria-label={acceptLabel}>
-        {acceptLabel}
+      <button type="submit" class="cookieConsent__Button" on:click={accept} aria-label={translation.acceptLabel}>
+        {translation.acceptLabel}
       </button>
     </div>
   </div>
@@ -205,30 +224,226 @@
 {#if settingsShown}
 <div class="cookieConsentOperations" transition:fade>
   <div class="cookieConsentOperations__List">
-    {#each choicesArr as choice}
-      {#if Object.hasOwnProperty.call(choicesMerged, choice.id) && choicesMerged[choice.id]}
-        <div
-          class="cookieConsentOperations__Item"
-          class:disabled={choice.id === 'necessary'}>
-          <input
-            type="checkbox"
-            id={`gdpr-check-${choice.id}`}
-            bind:checked={choicesMerged[choice.id].value}
-            disabled={choice.id === 'necessary'} />
-          <label for={`gdpr-check-${choice.id}`}>{choice.label}</label>
-          <span class="cookieConsentOperations__ItemLabel">
-            {choice.description}
-          </span>
-        </div>
-      {/if}
+    {#each choices as ct}
+      <div
+        class="cookieConsentOperations__Item"
+        class:disabled={ct === 'necessary'}>
+        <input
+          type="checkbox"
+          id={`gdpr-check-${ct}`}
+          checked={value(ct)}
+          on:click={() => toggled(ct)}
+          disabled={ct === 'necessary'} />
+        <label for={`gdpr-check-${ct}`}>{translation.cookieLabels[ct]}</label>
+        <span class="cookieConsentOperations__ItemLabel">
+          {translation.cookieDescriptions[ct]}
+        </span>
+      </div>
     {/each}
     <button
       type="submit"
       class="cookieConsent__Button cookieConsent__Button--Close"
-      aria-label={closeLabel}
+      aria-label={translation.closeLabel}
       on:click={() => { settingsShown = false } }>
-      {closeLabel}
+      {translation.closeLabel}
     </button>
   </div>
 </div>
 {/if}
+
+
+<style>
+.cookieConsentToggle {
+  width: 40px;
+  height: 40px;
+  position: fixed;
+  will-change: transform;
+  padding: 9px;
+  border: 0;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  background: white;
+  border-radius: 50%;
+  bottom: 20px;
+  right: 20px;
+  transition: 200ms;
+  opacity: 1;
+  z-index: 99980;
+}
+
+.cookieConsentToggle:hover {
+  color: white;
+  background: black;
+}
+
+.cookieConsentToggle * {
+  fill: currentColor;
+}
+
+.cookieConsentWrapper {
+  z-index: 99990;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: black;
+  color: white;
+  padding: 20px;
+  transition: 200ms;
+}
+
+.cookieConsent {
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+}
+
+.cookieConsent__Content {
+  margin-right: 40px;
+}
+
+.cookieConsent__Title {
+  margin: 0;
+  font-weight: bold;
+}
+
+.cookieConsent__Description {
+  margin: 10px 0 0;
+}
+
+.cookieConsent__Right {
+  display: flex;
+  align-items: flex-end;
+}
+
+.cookieConsentOperations {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  transition: 300ms;
+  will-change: transform;
+  z-index: 99999;
+}
+
+.cookieConsentOperations .cookieConsentOperations__List {
+  transform: scale(1);
+}
+
+.cookieConsentOperations__List {
+  background: white;
+  color: black;
+  max-width: 500px;
+  padding: 40px;
+  margin: auto;
+  overflow-y: auto;
+  box-sizing: border-box;
+  max-height: 100vh;
+  transition: 200ms transform;
+  will-change: transform;
+  transform: scale(0.95);
+}
+
+.cookieConsentOperations__Item {
+  display: block;
+  padding-left: 60px;
+  margin-bottom: 20px;
+}
+
+.cookieConsentOperations__Item.disabled {
+  color: #999;
+}
+
+.cookieConsentOperations__Item.disabled label::after {
+  opacity: 0.3;
+}
+
+.cookieConsentOperations__Item input {
+  display: none;
+}
+
+.cookieConsentOperations__Item label {
+  align-items: center;
+  font-size: 22px;
+  font-weight: bold;
+  display: block;
+  position: relative;
+}
+
+.cookieConsentOperations__Item label::before {
+  content: "";
+  display: block;
+  left: -60px;
+  background: #DEDEDE;
+  height: 20px;
+  border-radius: 20px;
+  width: 40px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.cookieConsentOperations__Item label::after {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: black;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: -58px;
+  transition: 200ms;
+}
+
+.cookieConsentOperations__Item input:checked+label::after {
+  transform: translate(20px, -50%);
+}
+
+.cookieConsent__Button {
+  padding: 15px 40px;
+  display: block;
+  background: white;
+  color: black;
+  white-space: nowrap;
+  border: 0;
+  font-size: 16px;
+  margin-left: 10px;
+  cursor: pointer;
+  transition: 200ms;
+}
+
+.cookieConsent__Button--Close {
+  background: black;
+  color: white;
+  margin: 40px 0 0 60px;
+  padding: 15px 60px;
+}
+
+.cookieConsent__Button:hover {
+  opacity: 0.6;
+}
+
+@media only screen and (max-width: 900px) {
+  .cookieConsent {
+    display: block;
+  }
+
+  .cookieConsent__Right {
+    margin-top: 20px;
+  }
+
+  .cookieConsent__Button {
+    margin: 0 10px 10px 0;
+  }
+
+  .cookieConsent__Button--Close {
+    margin: 40px 0 0;
+  }
+}
+
+
+</style>
