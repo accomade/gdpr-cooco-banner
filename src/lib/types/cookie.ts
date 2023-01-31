@@ -1,4 +1,4 @@
-export type CookieType= 'necessary' | 'tracking' | 'analytics' | 'marketing'
+export type CookieType= 'necessary' | 'preferences' | 'analytics' | 'marketing'
 
 export interface CookieChoice {
   value: boolean

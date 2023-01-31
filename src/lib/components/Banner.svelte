@@ -6,7 +6,7 @@
   
   const dispatchAnalytics = createEventDispatcher<{analytics: { enabled: boolean}}>()
   const dispatchMarketing = createEventDispatcher<{marketing: { enabled: boolean}}>()
-  const dispatchTracking = createEventDispatcher<{tracking: { enabled: boolean}}>()
+  const dispatchTracking = createEventDispatcher<{preferences: { enabled: boolean}}>()
   
   export let cookieName = "gdpr-cookie-consent"
   export let showEditIcon = true
@@ -36,11 +36,11 @@
     }
   }
 
-  let shown = false
-  let settingsShown = false
+  let show = false
+  let showSettings = false
 
-  export function show () {
-    shown = true
+  export function showBanner () {
+    show = true
   }
 
   onMount(() => {
@@ -48,7 +48,7 @@
     /**Read cookie*/
     const cookie = Cookies.get(cookieName)
     if (!cookie) {
-      show()
+      showBanner()
     }
 
     try {
@@ -64,7 +64,7 @@
       }
     } catch (e) {
       removeCookie()
-      show()
+      showBanner()
     }
   })
 
@@ -98,8 +98,8 @@
           case 'analytics': 
             dispatchAnalytics('analytics', { enabled: choice.value })
             break;
-          case 'tracking':
-            dispatchTracking('tracking', { enabled: choice.value })
+          case 'preferences':
+            dispatchTracking('preferences', { enabled: choice.value })
             break;
           case 'marketing':
             dispatchMarketing('marketing', { enabled: choice.value })
@@ -107,10 +107,18 @@
         }
       }
     }
-    shown = false
+    show = false
   }
 
-  const accept = () => {
+
+
+  const closeAndAcceptSelected = () => {
+    showSettings = false;
+    setCookie()
+    execute()
+  }
+
+  const acceptAll = () => {
     for( const t of choices ) {
       chosen[t] = {
         value: true
@@ -172,7 +180,7 @@
   <button
     class="cookieConsentToggle"
     aria-label={translation.editLabel}
-    on:click={show}
+    on:click={showBanner}
     transition:fade>
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
       <path
@@ -191,7 +199,7 @@
   </button>
 {/if}
 
-{#if shown}
+{#if show}
 <div class="cookieConsentWrapper" transition:fade>
   <div class="cookieConsent">
     <div class="cookieConsent__Left">
@@ -207,21 +215,27 @@
         type="button"
         class="cookieConsent__Button"
         aria-label={translation.settingsLabel}
-        on:click={() => { settingsShown = true } }>
+        on:click={() => { showSettings = true } }>
         {translation.settingsLabel}
       </button>
+      {#if choices.length > 1}
       <button type="submit" class="cookieConsent__Button" on:click={reject} aria-label={translation.rejectLabel}>
         {translation.rejectLabel}
       </button>
-      <button type="submit" class="cookieConsent__Button" on:click={accept} aria-label={translation.acceptLabel}>
+      <button type="submit" class="cookieConsent__Button" on:click={acceptAll} aria-label={translation.acceptLabel}>
         {translation.acceptLabel}
       </button>
+      {:else}
+      <button type="submit" class="cookieConsent__Button" on:click={closeAndAcceptSelected} aria-label={translation.rejectLabel}>
+        {translation.closeLabel}
+      </button>
+      {/if}
     </div>
   </div>
 </div>
 {/if}
 
-{#if settingsShown}
+{#if showSettings}
 <div class="cookieConsentOperations" transition:fade>
   <div class="cookieConsentOperations__List">
     {#each choices as ct}
@@ -244,7 +258,7 @@
       type="submit"
       class="cookieConsent__Button cookieConsent__Button--Close"
       aria-label={translation.closeLabel}
-      on:click={() => { settingsShown = false } }>
+      on:click={ closeAndAcceptSelected }>
       {translation.closeLabel}
     </button>
   </div>
@@ -444,6 +458,4 @@
     margin: 40px 0 0;
   }
 }
-
-
 </style>
