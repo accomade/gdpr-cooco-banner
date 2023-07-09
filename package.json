@@ -22,5 +22,14 @@
 	"type": "module",
 	"dependencies": {
 		"js-cookie": "^3.0.5"
-	}
+	},
+	"peerDependencies": {
+		"svelte": "^4.0.5"
+	},
+	"exports": {
+		".": {
+				"types": "./dist/index.d.ts",
+				"svelte": "./dist/index.js"
+		}
+}
 }
