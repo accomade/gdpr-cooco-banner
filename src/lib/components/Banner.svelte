@@ -271,6 +271,7 @@
 
 
 <style>
+
 .cookieConsentToggle {
   width: 40px;
   height: 40px;
@@ -309,6 +310,7 @@
   transition: 200ms;
 }
 
+
 .cookieConsent {
   margin: 0 auto;
   display: flex;
@@ -317,6 +319,10 @@
 
 .cookieConsent__Content {
   margin-right: 40px;
+}
+
+.cookieConsentWrapper * {
+  color: white;
 }
 
 .cookieConsent__Title {
