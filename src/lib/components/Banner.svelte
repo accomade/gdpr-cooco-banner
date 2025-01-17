@@ -1,25 +1,37 @@
 <script lang="ts">
+
   import Cookies from 'js-cookie'
   import { fade } from 'svelte/transition'
-  import { onMount, createEventDispatcher } from 'svelte'
+  import { onMount } from 'svelte'
   import type { CookieType, CookieChoice, Translation } from '$lib/types/cookie';
   
-  const dispatchAnalytics = createEventDispatcher<{analytics: { enabled: boolean}}>()
-  const dispatchMarketing = createEventDispatcher<{marketing: { enabled: boolean}}>()
-  const dispatchTracking = createEventDispatcher<{preferences: { enabled: boolean}}>()
+  interface Props {
+    cookieName?: string;
+    showEditIcon?: boolean;
+    translation: Translation;
+    /**Set by client, defines which cookie options will be displayed*/
+    choices: CookieType[];
+    analytics?: (enabled: boolean) => void;
+    marketing?: (enabled: boolean) => void;
+    preferences?: (enabled: boolean) => void;
+  }
+
+  let {
+    cookieName = "gdpr-cookie-consent",
+    showEditIcon = true,
+    translation,
+    choices,
+    analytics,
+    marketing,
+    preferences,
+  }: Props = $props();
   
-  export let cookieName = "gdpr-cookie-consent"
-  export let showEditIcon = true
-  export let translation:Translation
-  
-  /**Set by client, defines which cookie options will be displayed*/
-  export let choices:CookieType[]
   /**The options the user has chosen, from the set of possible options*/
   type Chosen = {[key in CookieType]?: CookieChoice};
-  let chosen:Chosen = {}
+  let chosen:Chosen = $state({})
 
   // (re)init chosen based on choices
-  $: {
+  $effect(() => {
     for(const ct of choices) {
       let choice = chosen[ct]
       
@@ -34,10 +46,10 @@
 
       chosen[ct] = choice;
     }
-  }
+  });
 
-  let show = false
-  let showSettings = false
+  let show = $state(false)
+  let showSettings = $state(false)
 
   export function showBanner () {
     show = true
@@ -99,13 +111,13 @@
 
         switch(t) {
           case 'analytics': 
-            dispatchAnalytics('analytics', { enabled: choice.value })
+            analytics?.(choice.value);
             break;
           case 'preferences':
-            dispatchTracking('preferences', { enabled: choice.value })
+            preferences?.(choice.value);
             break;
           case 'marketing':
-            dispatchMarketing('marketing', { enabled: choice.value })
+            marketing?.(choice.value);
             break;
         }
       }
@@ -184,7 +196,7 @@
   <button
     class="cookieConsentToggle"
     aria-label={translation.editLabel}
-    on:click={showBanner}
+    onclick={showBanner}
     transition:fade>
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
       <path
@@ -219,18 +231,18 @@
         type="button"
         class="cookieConsent__Button"
         aria-label={translation.settingsLabel}
-        on:click={() => { showSettings = true } }>
+        onclick={() => { showSettings = true }}>
         {translation.settingsLabel}
       </button>
       {#if choices.length > 1}
-      <button type="submit" class="cookieConsent__Button" on:click={reject} aria-label={translation.rejectLabel}>
+      <button type="submit" class="cookieConsent__Button" onclick={reject} aria-label={translation.rejectLabel}>
         {translation.rejectLabel}
       </button>
-      <button type="submit" class="cookieConsent__Button" on:click={acceptAll} aria-label={translation.acceptLabel}>
+      <button type="submit" class="cookieConsent__Button" onclick={acceptAll} aria-label={translation.acceptLabel}>
         {translation.acceptLabel}
       </button>
       {:else}
-      <button type="submit" class="cookieConsent__Button" on:click={closeAndAcceptSelected} aria-label={translation.rejectLabel}>
+      <button type="submit" class="cookieConsent__Button" onclick={closeAndAcceptSelected} aria-label={translation.rejectLabel}>
         {translation.closeLabel}
       </button>
       {/if}
@@ -250,7 +262,7 @@
           type="checkbox"
           id={`gdpr-check-${ct}`}
           checked={value(ct)}
-          on:click={() => toggled(ct)}
+          onclick={() => toggled(ct)}
           disabled={ct === 'necessary'} />
         <label for={`gdpr-check-${ct}`}>{translation.cookieLabels[ct]}</label>
         <span class="cookieConsentOperations__ItemLabel">
@@ -262,7 +274,7 @@
       type="submit"
       class="cookieConsent__Button cookieConsent__Button--Close"
       aria-label={translation.closeLabel}
-      on:click={ closeAndAcceptSelected }>
+      onclick={closeAndAcceptSelected}>
       {translation.closeLabel}
     </button>
   </div>
