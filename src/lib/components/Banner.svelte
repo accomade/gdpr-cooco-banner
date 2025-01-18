@@ -180,7 +180,6 @@
   }
 
   const toggled = (ct:CookieType) => {
-    console.log(ct);
     let choice = chosen[ct]
     if( !choice ){
       choice = {value: true}
