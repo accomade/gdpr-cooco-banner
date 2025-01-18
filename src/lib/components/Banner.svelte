@@ -28,24 +28,23 @@
   
   /**The options the user has chosen, from the set of possible options*/
   type Chosen = {[key in CookieType]?: CookieChoice};
-  let chosen:Chosen = $state({})
-
-  // (re)init chosen based on choices
-  $effect(() => {
-    for(const ct of choices) {
-      let choice = chosen[ct]
-      
+  let chosen:Chosen = $derived.by( () => {
+    const result:Chosen = {};
+    for(const ct of choices) { 
       //necessary is alway true
+      let choice: CookieChoice | undefined;
       if(ct == 'necessary') {
         choice = { value: true }
       }
 
+      //otherwise initialize with false;
       if (!choice) {
         choice = { value: false }
       }
 
-      chosen[ct] = choice;
+      result[ct] = choice;
     }
+    return result;
   });
 
   let show = $state(false)
@@ -64,9 +63,11 @@
     }
 
     if(cookie) {
-
       try {
-        chosen = JSON.parse(cookie)
+        const chosenCookie:Chosen = JSON.parse(cookie) as Chosen
+        for(const cc in chosenCookie) {
+          chosen[cc as CookieType] = chosenCookie[cc as CookieType] as CookieChoice;
+        }
       }
       catch(e) {
         //JSON parse error ... some tinkering?
@@ -179,6 +180,7 @@
   }
 
   const toggled = (ct:CookieType) => {
+    console.log(ct);
     let choice = chosen[ct]
     if( !choice ){
       choice = {value: true}
